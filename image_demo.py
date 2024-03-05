@@ -1,8 +1,11 @@
 # Copyright (c) Tencent Inc. All rights reserved.
 import os
 import cv2
+import time
 import argparse
 import os.path as osp
+import numpy as np
+from matplotlib import pyplot as plt
 
 import torch
 from mmengine.config import Config, DictAction
@@ -17,6 +20,18 @@ from mmyolo.registry import RUNNERS
 
 BOUNDING_BOX_ANNOTATOR = None  # Define BOUNDING_BOX_ANNOTATOR object
 LABEL_ANNOTATOR = None  # Define LABEL_ANNOTATOR object
+
+"""
+python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gpus_obj365v1_goldg_train_1280ft_lvis_minival.py yolo_world_v2_l_obj365v1_goldg_pretrain_1280ft-9babe3f6.pth \
+    /home/xuanlin/Downloads/imgs_test_detection 'towel,bowl,spoon,tomato can' --topk 100 --threshold 0.1 --output-dir demo_outputs
+"""
+
+def show_box(box: np.ndarray, ax, label) -> None:
+    x0, y0 = box[0], box[1]
+    w, h = box[2] - box[0], box[3] - box[1]
+    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green',
+                               facecolor=(0, 0, 0, 0), lw=2))
+    ax.text(x0, y0, label)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='YOLO-World Demo')
@@ -78,29 +93,42 @@ def inference_detector(runner,
     data_batch = dict(inputs=data_info['inputs'].unsqueeze(0),
                       data_samples=[data_info['data_samples']])
 
+    tt = time.time()
     with autocast(enabled=use_amp), torch.no_grad():
         output = runner.model.test_step(data_batch)[0]
         pred_instances = output.pred_instances
         pred_instances = pred_instances[
             pred_instances.scores.float() > score_thr]
+    print("Time", time.time() - tt)
     if len(pred_instances.scores) > max_dets:
         indices = pred_instances.scores.float().topk(max_dets)[1]
         pred_instances = pred_instances[indices]
 
     pred_instances = pred_instances.cpu().numpy()
-    detections = None  # Define detections object
-
-    labels = [
-        f"{texts[class_id][0]} {confidence:0.2f}" for class_id, confidence in
-        zip(detections.class_id, detections.confidence)
-    ]
-
-    #label images
-    image = cv2.imread(image_path)
+    print(pred_instances)
+    
+    image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
     anno_image = image.copy()
-    image = BOUNDING_BOX_ANNOTATOR.annotate(image, detections)
-    image = LABEL_ANNOTATOR.annotate(image, detections, labels=labels)
-    cv2.imwrite(osp.join(output_dir, osp.basename(image_path)), image)
+    plt.figure(figsize=(10, 10))
+    plt.imshow(anno_image)
+    ax = plt.gca()
+    for (label, score, bbox) in zip(pred_instances['labels'], pred_instances['scores'], pred_instances['bboxes']):
+        show_box(bbox, ax, texts[label][0] + f' {score:0.2f}')
+    plt.savefig(osp.join(output_dir, osp.basename(image_path)))
+    
+    # detections = None  # Define detections object
+
+    # labels = [
+    #     f"{texts[class_id][0]} {confidence:0.2f}" for class_id, confidence in
+    #     zip(detections.class_id, detections.confidence)
+    # ]
+
+    # #label images
+    # image = cv2.imread(image_path)
+    # anno_image = image.copy()
+    # image = BOUNDING_BOX_ANNOTATOR.annotate(image, detections)
+    # image = LABEL_ANNOTATOR.annotate(image, detections, labels=labels)
+    # cv2.imwrite(osp.join(output_dir, osp.basename(image_path)), image)
 
 
     if annotation:
