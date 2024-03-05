@@ -14,6 +14,7 @@ from mmengine.runner.amp import autocast
 from mmengine.dataset import Compose
 from mmengine.utils import ProgressBar
 from mmyolo.registry import RUNNERS
+from transformers.models.owlvit.image_processing_owlvit import box_iou
 
 # Removed unnecessary import
 # import supervision as sv
@@ -24,6 +25,9 @@ LABEL_ANNOTATOR = None  # Define LABEL_ANNOTATOR object
 """
 python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gpus_obj365v1_goldg_train_1280ft_lvis_minival.py yolo_world_v2_l_obj365v1_goldg_pretrain_1280ft-9babe3f6.pth \
     /home/xuanlin/Downloads/imgs_test_detection 'towel,bowl,spoon,tomato can' --topk 100 --threshold 0.1 --output-dir demo_outputs
+
+python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gpus_obj365v1_goldg_train_1280ft_lvis_minival.py yolo_world_v2_l_obj365v1_goldg_pretrain_1280ft-9babe3f6.pth \
+    ../example_imgs_openx 'eggplant,microwave,banana,fork,yellow towel,red towel,blue towel,red bowl,blue bowl,purple towel,steel bowl,white bowl,red spoon,green spoon,blue spoon,tomato can,strawberry,corn,yellow plate,red plate,cabinet,fridge,screwdriver,mushroom,plastic bottle,coke can,pepsi can,green chip bag,brown chip bag,blue chip bag,sponge,apple,orange' --topk 100 --threshold 0.1 --output-dir demo_outputs
 """
 
 def show_box(box: np.ndarray, ax, label) -> None:
@@ -32,6 +36,8 @@ def show_box(box: np.ndarray, ax, label) -> None:
     ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green',
                                facecolor=(0, 0, 0, 0), lw=2))
     ax.text(x0, y0, label)
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='YOLO-World Demo')
@@ -97,6 +103,13 @@ def inference_detector(runner,
     with autocast(enabled=use_amp), torch.no_grad():
         output = runner.model.test_step(data_batch)[0]
         pred_instances = output.pred_instances
+        scores_sorted_ids = torch.argsort(-pred_instances['scores'])
+        for idx in scores_sorted_ids:
+            if pred_instances['scores'][idx] < 0.01:
+                continue
+            ious = box_iou(pred_instances['bboxes'][idx:idx+1], pred_instances['bboxes'])[0][0]
+            ious[idx] = -1.0 # mask out self-IoU
+            pred_instances['scores'][ious > 0.3] = 0.0
         pred_instances = pred_instances[
             pred_instances.scores.float() > score_thr]
     print("Time", time.time() - tt)
