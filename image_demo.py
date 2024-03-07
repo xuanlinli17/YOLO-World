@@ -28,6 +28,10 @@ python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gp
 
 python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gpus_obj365v1_goldg_train_1280ft_lvis_minival.py yolo_world_v2_l_obj365v1_goldg_pretrain_1280ft-9babe3f6.pth \
     ../example_imgs_openx 'eggplant,microwave,banana,fork,yellow towel,red towel,blue towel,red bowl,blue bowl,purple towel,steel bowl,white bowl,red spoon,green spoon,blue spoon,tomato can,strawberry,corn,yellow plate,red plate,cabinet,fridge,screwdriver,mushroom,plastic bottle,coke can,pepsi can,green chip bag,brown chip bag,blue chip bag,sponge,apple,orange' --topk 100 --threshold 0.1 --output-dir demo_outputs
+
+python image_demo.py ./configs/pretrain/yolo_world_v2_l_vlpan_bn_2e-3_100e_4x8gpus_obj365v1_goldg_train_1280ft_lvis_minival.py yolo_world_v2_l_obj365v1_goldg_pretrain_1280ft-9babe3f6.pth \
+    ../example_imgs_openx 'eggplant,microwave,banana,fork,yellow towel,red towel,blue towel,red bowl,blue bowl,purple towel,steel bowl,white bowl,red spoon,green spoon,blue spoon,can,strawberry,corn,yellow plate,red plate,cabinet,fridge,screwdriver,mushroom,plastic bottle,green chip bag,brown chip bag,blue chip bag,apple,orange' --topk 100 --threshold 0.1 --output-dir demo_outputs
+
 """
 
 def show_box(box: np.ndarray, ax, label) -> None:
